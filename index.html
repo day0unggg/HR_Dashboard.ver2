@@ -371,11 +371,9 @@ function renderLevelBoxplot(map) {
             label: (ctx) => {
               const d = ctx.raw;
               return [
-                `Max  ${f(d.max)}만원`,
-                `Q3    ${f(d.q3)}만원`,
-                `중앙값 ${f(d.median)}만원`,
-                `Q1    ${f(d.q1)}만원`,
-                `Min   ${f(d.min)}만원`,
+                `Max     ${f(d.max)}만원`,
+                `Median  ${f(d.median)}만원`,
+                `Min     ${f(d.min)}만원`,
               ];
             },
           },
