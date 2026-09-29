@@ -113,6 +113,9 @@
 
   <!-- ===================== 3. 평가 및 보상 ===================== -->
   <div class="tabpage" id="page-comp">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+      <span id="compAsOf" style="font-size:12px; color:#64748b; background:#f1f5f9; padding:4px 10px; border-radius:999px;"></span>
+    </div>
     <div class="kpi-row" id="kpiComp"></div>
 
     <div class="section-title">성과등급</div>
@@ -131,11 +134,11 @@
       <div class="card"><h2>직군별 평균연봉</h2><div class="chart-wrap"><canvas id="chartTrackPay"></canvas></div></div>
     </div>
 
-    <div class="section-title">형평성 · 근무지</div>
+    <div class="section-title">형평성 · 급여 구성</div>
     <div class="grid">
       <div class="card"><h2>성별 평균연봉 비교</h2><div class="chart-wrap"><canvas id="chartGenderPay"></canvas></div></div>
       <div class="card"><h2>정규직 / 계약직 평균연봉</h2><div class="chart-wrap"><canvas id="chartEmpTypePay"></canvas></div></div>
-      <div class="card"><h2>근무지별 평균연봉</h2><div class="chart-wrap"><canvas id="chartLocPay"></canvas></div></div>
+      <div class="card"><h2>급여 구성비 (기본급 / 고정연장수당)</h2><div class="chart-wrap"><canvas id="chartPayMix"></canvas></div></div>
     </div>
   </div>
 
@@ -229,7 +232,7 @@ const API_KEY = "AIzaSyD83ZbcecC-6lIeQ-1gxjLNseZqdyDpQLI";
 
 const RANGES = {
   staff: "'2. 재직자 현황'!B2:C60",
-  comp: "'3. 평가 및 보상'!B2:C90",
+  comp: "'3. 평가 및 보상'!B1:C200",
   exit: "'4. 퇴사 분석'!B2:C89",
   exitTrend: "'4. 퇴사 분석'!B92:F104",
   recruitStats: "'5. 채용'!B1:C40",
@@ -335,6 +338,7 @@ function renderBar(id, map, labels, color, showLabels) {
 }
 function renderLevelBoxplot(map) {
   const levels = ["사원", "대리", "과장", "차장", "부장"];
+  const levelColors = ["#C2C8D2", "#8691A5", "#4D5074", "#2B4071", "#1C2A49"];
   const data = levels.map((lv) => ({
     min: num(map[`직급별 연봉 Min (${lv})`]),
     q1: num(map[`직급별 연봉 Q1 (${lv})`]),
@@ -342,23 +346,50 @@ function renderLevelBoxplot(map) {
     q3: num(map[`직급별 연봉 Q3 (${lv})`]),
     max: num(map[`직급별 연봉 Max (${lv})`]),
   }));
+  const f = (n) => Math.round(n).toLocaleString();
   upsertChart("chartLevelPay", {
     type: "boxplot",
     data: {
       labels: levels,
       datasets: [{
         label: "연봉(만원)",
-        backgroundColor: "rgba(43,64,113,0.25)",
-        borderColor: COLORS.blue,
-        borderWidth: 1.5,
+        backgroundColor: levelColors.map((c) => c + "59"),
+        borderColor: levelColors,
+        borderWidth: 2,
+        medianColor: "#0f172a",
         itemRadius: 0,
         data,
       }],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, datalabels: { display: false } },
-      scales: { y: { beginAtZero: false, title: { display: true, text: "만원" } } },
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = ctx.raw;
+              return [
+                `Max  ${f(d.max)}만원`,
+                `Q3    ${f(d.q3)}만원`,
+                `중앙값 ${f(d.median)}만원`,
+                `Q1    ${f(d.q1)}만원`,
+                `Min   ${f(d.min)}만원`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          title: { display: true, text: "만원" },
+          ticks: { callback: (v) => Number(v).toLocaleString() },
+          grid: { color: "#eef1f4" },
+        },
+        x: { grid: { display: false } },
+      },
     },
   });
 }
@@ -385,6 +416,7 @@ function renderStaffPage(map) {
 
 /* ---------- 3. 평가 및 보상 ---------- */
 function renderCompPage(map) {
+  document.getElementById("compAsOf").textContent = "기준: " + (map["기준"] || "-");
   document.getElementById("kpiComp").innerHTML = kpiHtml([
     { label: "전사 평균연봉", value: money(map["전사 평균연봉"]) },
     { label: "전사 중앙값 연봉", value: money(map["전사 중앙값 연봉"]) },
@@ -431,10 +463,9 @@ function renderCompPage(map) {
 
   renderBar("chartGenderPay", { "남": map["성별 평균연봉 (남)"], "여": map["성별 평균연봉 (여)"] }, ["남", "여"], COLORS.teal, "money");
   renderBar("chartEmpTypePay", { "정규직": map["정규직/계약직 평균연봉 (정규직)"], "계약직": map["정규직/계약직 평균연봉 (계약직)"] }, ["정규직", "계약직"], COLORS.gray, "money");
-  renderBar("chartLocPay", {
-    "서울": map["근무지별 평균연봉 (서울)"], "부산": map["근무지별 평균연봉 (부산)"], "광주": map["근무지별 평균연봉 (광주)"],
-    "대구": map["근무지별 평균연봉 (대구)"], "인천": map["근무지별 평균연봉 (인천)"],
-  }, ["서울", "부산", "광주", "대구", "인천"], COLORS.red);
+  renderDonut("chartPayMix", {
+    "기본급": map["급여 구성비 (기본급) (%)"], "고정연장수당": map["급여 구성비 (고정연장수당) (%)"],
+  }, ["기본급", "고정연장수당"], (v) => v + "%");
 }
 
 /* ---------- 4. 퇴사 분석 ---------- */
