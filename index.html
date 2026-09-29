@@ -127,7 +127,7 @@
     <div class="grid">
       <div class="card"><h2>연차 구간별 평균연봉</h2><div class="chart-wrap"><canvas id="chartTenurePay"></canvas></div></div>
       <div class="card"><h2>부서별 평균연봉</h2><div class="chart-wrap"><canvas id="chartDeptPay"></canvas></div></div>
-      <div class="card"><h2>직급별 평균연봉</h2><div class="chart-wrap"><canvas id="chartLevelPay"></canvas></div></div>
+      <div class="card"><h2>직급별 연봉 분포 (박스플롯)</h2><div class="chart-wrap"><canvas id="chartLevelPay"></canvas></div></div>
       <div class="card"><h2>직군별 평균연봉</h2><div class="chart-wrap"><canvas id="chartTrackPay"></canvas></div></div>
     </div>
 
@@ -219,6 +219,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.2.4/build/index.umd.min.js"></script>
 <script>
 /* =========================================================
    설정: 아래 두 값을 채워주세요.
@@ -332,6 +333,36 @@ function renderBar(id, map, labels, color, showLabels) {
     plugins: [ChartDataLabels],
   });
 }
+function renderLevelBoxplot(map) {
+  const levels = ["사원", "대리", "과장", "차장", "부장"];
+  const data = levels.map((lv) => ({
+    min: num(map[`직급별 연봉 Min (${lv})`]),
+    q1: num(map[`직급별 연봉 Q1 (${lv})`]),
+    median: num(map[`직급별 연봉 중앙값 (${lv})`]),
+    q3: num(map[`직급별 연봉 Q3 (${lv})`]),
+    max: num(map[`직급별 연봉 Max (${lv})`]),
+  }));
+  upsertChart("chartLevelPay", {
+    type: "boxplot",
+    data: {
+      labels: levels,
+      datasets: [{
+        label: "연봉(만원)",
+        backgroundColor: "rgba(43,64,113,0.25)",
+        borderColor: COLORS.blue,
+        borderWidth: 1.5,
+        itemRadius: 0,
+        data,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, datalabels: { display: false } },
+      scales: { y: { beginAtZero: false, title: { display: true, text: "만원" } } },
+    },
+  });
+}
+
 function kpiHtml(items) {
   return items.map((it) =>
     `<div class="kpi-card${it.insight ? ' insight' : ''}"><p class="label">${it.label}</p><p class="value">${it.value}</p></div>`
@@ -394,10 +425,7 @@ function renderCompPage(map) {
     "R&D센터": map["부서별 평균연봉 (R&D센터)"], "영업팀": map["부서별 평균연봉 (영업팀)"], "재무팀": map["부서별 평균연봉 (재무팀)"],
   }, ["HR팀", "IT개발팀", "R&D센터", "영업팀", "재무팀"], COLORS.blue);
 
-  renderBar("chartLevelPay", {
-    "사원": map["직급별 평균연봉 (사원)"], "대리": map["직급별 평균연봉 (대리)"], "과장": map["직급별 평균연봉 (과장)"],
-    "차장": map["직급별 평균연봉 (차장)"], "부장": map["직급별 평균연봉 (부장)"],
-  }, ["사원", "대리", "과장", "차장", "부장"], COLORS.orange);
+  renderLevelBoxplot(map);
 
   renderDonut("chartTrackPay", { "스텝": map["직군별 평균연봉 (스텝)"], "라인": map["직군별 평균연봉 (라인)"] }, ["스텝", "라인"], (v) => Math.round(v).toLocaleString() + "만원");
 
